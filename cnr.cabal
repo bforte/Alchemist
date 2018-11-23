@@ -1,0 +1,29 @@
+name:                cnr
+version:             0.1.0.0
+synopsis:            Esolang based on Chemical Reaction Networks
+homepage:            https://github.com/bforte/cnr#README.md
+license:             BSD3
+license-file:        LICENSE
+author:              BMO
+maintainer:          bforte@pm.me
+copyright:           2018 BMO
+category:            Language
+build-type:          Simple
+cabal-version:       >=1.10
+extra-source-files:  README.md
+
+executable cnr
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  other-modules:       Parser.hs
+  default-language:    Haskell2010
+  default-extensions:  LambdaCase
+  ghc-options:         >
+    -Wunused-imports
+    -Wunused-matches
+    -Wincomplete-patterns
+    -O2 -threaded
+  build-depends:       base >= 4.7 && < 5
+                     , mtl
+                     , parsec
+                     , random
