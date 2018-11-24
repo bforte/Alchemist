@@ -19,10 +19,13 @@ type Add a = a -> a -> a
 --   Flags :       expr  add          seed          debug help
 data Flags = Flags Bool (Add Inputs) (Maybe String) Bool  Bool
 defaults = Flags False merge Nothing False False where
-  merge a b =
-    [ (i,sum cs)
-    | (i:_,cs) <- map unzip . groupBy ((==) `on` fst) $ a ++ b
-    ]
+
+merge a b =
+  [ (i,sum cs)
+  | (i:_,cs) <- map unzip . groupBy ((==) `on` fst)
+                          . sortOn fst
+                          $ a ++ b
+  ]
 
 options =
   [ Option "e" ["expression"] (NoArg expr) "evaluate expression"
@@ -56,7 +59,7 @@ runMain (x:xs) (Flags e a s d _) = do
   out <- either (fail . ('\n':) . show) runProg $ do
     (prog,us) <- parseProg src
     vs <- zipWithM parseInput [1..] xs
-    pure (prog, us `a` vs)
+    pure (prog, merge [] us `a` merge [] vs)
   when d $ do
     hFlush stdout
     hPutStrLn stderr "\n---------- Remaining Universe----------"

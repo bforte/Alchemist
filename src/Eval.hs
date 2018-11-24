@@ -4,6 +4,7 @@ module Eval ( Ident(..), Inputs, Prog, runProg ) where
 
 import Control.Monad.State.Strict
 import Data.Foldable
+import Data.Function
 import Data.List
 import Data.Map.Strict (Map, alter, findWithDefault, fromList, update)
 import System.IO
@@ -19,7 +20,7 @@ type RHS = [(Integer,Ident)]
 type Universe = Map String Integer
 
 data Ident = In String | Out String | Id String
-  deriving (Show,Eq)
+  deriving (Show,Eq,Ord)
 
 {-instance {-# OVERLAPS #-} Show Rule where
   show (l,r) = sl l ++ " -> " ++ sr r where
@@ -30,7 +31,15 @@ data Ident = In String | Out String | Id String
     s (In s) = "In_" ++ show s   ---}
 
 runProg :: (Prog,Inputs) -> IO Universe
-runProg (prog,xs) = execStateT loop (fromList xs)  where
+runProg (prog,xs) = runProg' unified xs where
+  unified = [(unify l, unify r) | (l,r) <- prog]
+  unify x =
+    [ (sum cs,i)
+    | (cs,i:_) <- map unzip . groupBy ((==) `on` snd) $ sortOn snd x
+    ]
+
+runProg' :: Prog -> Inputs -> IO Universe
+runProg' prog xs = execStateT loop (fromList xs)  where
   loop = do
     st <- get
     case filter (applicable st) prog of

@@ -15,7 +15,8 @@ type Parser a = Parsec String () a
 parseProg :: String -> Parsed (Prog,Inputs)
 parseProg = parse (progP <* eof) "src"  where
 
-  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline <*> inputsP
+  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline
+                          <*> (inputsP <* eof <|> [] <$ eof)
 
   -- Parsing the program
   lineP = Just <$> ruleP <|> comment
