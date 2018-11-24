@@ -10,15 +10,14 @@ import Eval
 type Parsed a = Either ParseError a
 type Parser a = Parsec String () a
 
--- | Parse a single command-line argument of the form IDENT:NUMBER
-parseInput :: Integer -> String -> Parsed Input
-parseInput = parse (inputP <* eof) . ("arg-"++) . show  where
-  inputP = (,) <$> (spaces *> identP') <*> (string' ":" *> numberP <* spaces)
 
 -- | Parse a complete program; ie. multiple rules (LHS,RHS) ignoring comments
-parseProg :: String -> Parsed Prog
-parseProg = parse (catMaybes <$> lineP `sepEndBy` cNewline <* eof) "src"  where
+parseProg :: String -> Parsed (Prog,Inputs)
+parseProg = parse (progP <* eof) "src"  where
 
+  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline <*> inputsP
+
+  -- Parsing the program
   lineP = Just <$> ruleP <|> comment
 
   ruleP = (,) <$> (spaces *> lhsP) <*> (rSepP *> rhsP <* spaces')
@@ -31,6 +30,15 @@ parseProg = parse (catMaybes <$> lineP `sepEndBy` cNewline <* eof) "src"  where
 
   multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
 
+  -- Parsing possible inputs separated by bang
+  inputsP = char '!' *> inputP `sepEndBy` many1 space
+
+
+-- | Parse a single command-line argument of the form IDENT:NUMBER
+parseInput :: Integer -> String -> Parsed (String,Integer)
+parseInput = parse (inputP <* eof) . ("arg-"++) . show
+
+inputP = (,) <$> identP' <*> (char ':' *> numberP)
 
 {- Some more general parsers -}
 

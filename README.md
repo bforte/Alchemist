@@ -1,1 +1,3 @@
 # cnr
+
+see `examples/`
