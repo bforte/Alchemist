@@ -37,7 +37,7 @@ options =
     debug (Flags e a s _ h) = Flags e a s True h
     help  (Flags e a s d _) = Flags e a s d True
 
-usage = usageInfo "usage: cnr [-h] [-s SEED] (-e EXPR | FILE) INPUTS" options
+usage = usageInfo "usage: crn [-h] [-s SEED] (-e EXPR | FILE) INPUTS" options
 
 
 main = getOpt Permute options <$> getArgs >>= \case
