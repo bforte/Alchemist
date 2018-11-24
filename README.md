@@ -29,5 +29,29 @@ with a number.
 One can also write a `0` in front of an atom which means the rule is only
 applicable if there is no such atom at all, this can be used for control-flow.
 
-For more information, see
-[*examples/*](https://github.com/bforte/crn/tree/master/examples).
+## Initial Universe
+
+The initial universe is either determined by user inputs, constant inputs or
+both:
+
+  - **user inputs** are given via the commandline when invoking the
+    interpreter. For example `crn MyFantasticProgram.crn x:101` will use an
+    initial universe with 101 `x`s
+  - **constant inputs** are given in the source code directely. These inputs
+    are also of the form `atomName:[0-9]+` and are specified after the rules,
+    separated with a `!`
+
+Usually these two will be merged, ie. the interpreter adds the numbers of the
+inputs of them, you can override the constant inputs completely by using the
+`--override` flag.
+
+For more information, see the [*Examples*](https://github.com/bforte/crn/tree/master/examples).
+
+## Interpreter
+
+    usage: crn [-h] [-s SEED] (-e EXPR | FILE) INPUTS
+      -e       --expression  evaluate expression
+      -o       --override    override constant inputs (merges by default)
+      -s SEED  --seed=SEED   set seed
+      -d       --debug       print the final state to stderr
+      -h       --help        print this help
