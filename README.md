@@ -22,7 +22,7 @@ Regular atoms consist can only contain characters `[0-9A-Za-z_]`.
 
 ## Multiplicity
 
-The atoms can have a number in front of them (eg. `2H + O -> 2H2O`) which is
+The atoms can have a number in front of them (eg. `2H + O -> H2O`) which is
 short-hand for `H + H + O -> H2O`. This is the reason why atoms cannot start
 with a number.
 
