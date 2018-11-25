@@ -45,6 +45,8 @@ Usually these two will be merged, ie. the interpreter adds the numbers of the
 inputs of them, you can override the constant inputs completely by using the
 `--override` flag.
 
+By default the universe will initially contain the atom `_`.
+
 For more information, see the [*Examples*](https://github.com/bforte/alchemist/tree/master/examples).
 
 ## Interpreter

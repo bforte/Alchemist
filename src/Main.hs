@@ -64,7 +64,7 @@ runMain (x:xs) (Flags e a s d _) = do
   out <- either fail (runProg $ d == D2) $ do
     (prog,us) <- parseProg src
     vs <- zipWithM parseInput [1..] xs
-    pure (prog, merge [] us `a` merge [] vs)
+    pure (prog, merge [("_",1)] us `a` merge [] vs)
   when (d /= D0) $ do
     hFlush stdout
     hPutStrLn stderr "\n---------- Remaining Universe----------"
