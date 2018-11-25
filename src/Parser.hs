@@ -2,18 +2,20 @@
 
 module Parser ( parseInput, parseProg ) where
 
+import Data.Bifunctor
+import Data.List
 import Data.Maybe
 import Text.Parsec
 
 import Eval
 
-type Parsed a = Either ParseError a
+type Parsed a = Either String a
 type Parser a = Parsec String () a
 
 
 -- | Parse a complete program; ie. multiple rules (LHS,RHS) ignoring comments
 parseProg :: String -> Parsed (Prog,Inputs)
-parseProg = parse (progP <* eof) "src"  where
+parseProg = parse' (progP <* eof) "src"  where
 
   progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline
                           <*> (inputsP <* eof <|> [] <$ eof)
@@ -23,25 +25,36 @@ parseProg = parse (progP <* eof) "src"  where
 
   ruleP = (,) <$> (spaces *> lhsP) <*> (rSepP *> rhsP <* spaces')
 
-  lhsP = multi (identP' <* spaces') `sepBy` iSepP
-  rhsP = multi (identP  <* spaces') `sepBy` iSepP
+  lhsP = multi' (identP' <* spaces') `sepBy` iSepP
+  rhsP = multi  (identP  <* spaces') `sepBy` iSepP
 
   rSepP = string' "->"
   iSepP = string' "+"
+
+  multi' p = multi p >>= \case
+    (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
+            -> fail $ "invalid atom: '" ++ s ++ "'"
+          | otherwise -> pure (i,s)
 
   multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
 
   -- Parsing possible inputs separated by bang
   inputsP = char '!' *> inputP `sepEndBy` many1 space
 
-
 -- | Parse a single command-line argument of the form IDENT:NUMBER
 parseInput :: Integer -> String -> Parsed (String,Integer)
-parseInput = parse (inputP <* eof) . ("arg-"++) . show
+parseInput = parse' (inputP <* eof) . ("arg-"++) . show
 
-inputP = (,) <$> identP' <*> (char ':' *> numberP)
+
+parse' :: Parser a -> SourceName -> String -> Parsed a
+parse' p s = first (pretty . show) . parse p s  where
+  pretty = ('\n':) . (++"\n") . concatMap ("  "++) . lines
+
 
 {- Some more general parsers -}
+
+inputP :: Parser (String,Integer)
+inputP = (,) <$> identP' <*> (char ':' *> numberP)
 
 comment :: Monoid m => Parser m
 comment = mempty <$ char '#' <* many (noneOf "\n")

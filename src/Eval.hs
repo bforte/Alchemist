@@ -1,8 +1,9 @@
---{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 module Eval ( Ident(..), Inputs, Prog, runProg ) where
 
 import Control.Monad.State.Strict
+import Data.Char
 import Data.Foldable
 import Data.Function
 import Data.List
@@ -20,33 +21,38 @@ type RHS = [(Integer,Ident)]
 type Universe = Map String Integer
 
 data Ident = In String | Out String | Id String
-  deriving (Show,Eq,Ord)
+  deriving (Eq,Ord)
 
-{-instance {-# OVERLAPS #-} Show Rule where
+instance Show Ident where
+    show (Id s) = s
+    show (Out s) = "Out_" ++ show s
+    show (In s) = "In_" ++ s
+
+instance {-# OVERLAPS #-} Show Rule where
   show (l,r) = sl l ++ " -> " ++ sr r where
-    sl x = intercalate " + " [ show n ++ i | (n,i) <- x]
-    sr x = intercalate " + " [ show n ++ s i | (n,i) <- x]
-    s (Id s) = s
-    s (Out s) = "Out_" ++ show s
-    s (In s) = "In_" ++ show s   ---}
+    sl x = intercalate " + " [ s n ++ i | (n,i) <- x]
+    sr x = intercalate " + " [ s n ++ show i | (n,i) <- x]
+    s 1 = ""
+    s n = show n
 
-runProg :: (Prog,Inputs) -> IO Universe
-runProg (prog,xs) = runProg' unified xs where
-  unified = [(unify l, unify r) | (l,r) <- prog]
-  unify x =
-    [ (sum cs,i)
-    | (cs,i:_) <- map unzip . groupBy ((==) `on` snd) $ sortOn snd x
-    ]
+runProg :: Bool -> (Prog,Inputs) -> IO Universe
+runProg d (prog,xs) = do
+    hPutStrLn stderr . ("seed: "++) . show . show =<< getStdGen
+    runProg' d [(unify l, unify r) | (l,r) <- prog] xs
+  where unify x = [ (sum cs,i)
+                  | (cs,i:_) <- map unzip . groupBy ((==) `on` snd)
+                                          $ sortOn snd x
+                  ]
 
-runProg' :: Prog -> Inputs -> IO Universe
-runProg' prog xs = execStateT loop (fromList xs)  where
+runProg' :: Bool -> Prog -> Inputs -> IO Universe
+runProg' d prog xs = execStateT loop (fromList xs)  where
   loop = do
     st <- get
     case filter (applicable st) prog of
       [] -> pure ()
       rs -> do
-        --liftIO . putStrLn $ "rs: " ++ intercalate "; " (show <$> rs)
         r <- liftIO $ (rs !!) <$> randomRIO (0,length rs-1)
+        when d . liftIO $ hPrint stderr r
         st' <- liftIO $ apply r st
         put st'
         loop
@@ -84,7 +90,7 @@ apply (lhs,rhs) xs = flip (foldlM alterM) rhs
 
   readNumber = getLine >>= \case
     "" -> readNumber
-    s | all (`elem`['0'..'9']) s -> pure $ read s
+    s | all isDigit s -> pure $ read s
       | otherwise -> hPutStrLn stderr "invalid input" >> readNumber
 
 

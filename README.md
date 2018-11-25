@@ -49,9 +49,27 @@ For more information, see the [*Examples*](https://github.com/bforte/crn/tree/ma
 
 ## Interpreter
 
+    bmo@Ooo % crn -h
     usage: crn [-h] [-s SEED] (-e EXPR | FILE) INPUTS
-      -e       --expression  evaluate expression
-      -o       --override    override constant inputs (merges by default)
-      -s SEED  --seed=SEED   set seed
-      -d       --debug       print the final state to stderr
-      -h       --help        print this help
+      -e         --expression     evaluate expression
+      -o         --override       override constant inputs (merges by default)
+      -s SEED    --seed=SEED      set seed
+      -d[LEVEL]  --debug[=LEVEL]  set debug level (0 to 2)
+      -h         --help           print this help
+
+### Seeding
+
+The `SEED` can be any string to achieve deterministic results, the program will
+print the used seed to *stderr*. For example:
+
+    seed: "1957628721 1"
+
+If we now run `crn -s "1957628721 1" Program.crn` we will get the same results
+as in the previous run.
+
+### Debugging
+
+Debug levels:
+  - **0:** quiet; prints only the used seed
+  - **1:** helpful; like **0** but also prints the remaining universe at the end
+  - **2:** noisy; like **1** but also prints each applied rule
