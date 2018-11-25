@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, TupleSections #-}
 
 module Parser ( parseInput, parseProg ) where
 
@@ -54,7 +54,8 @@ parse' p s = first (pretty . show) . parse p s  where
 {- Some more general parsers -}
 
 inputP :: Parser (String,Integer)
-inputP = (,) <$> identP' <*> (char ':' *> numberP)
+inputP =  (,) <$> identP' <*> (char ':' *> numberP)
+      <|> ("_",) . pred <$> numberP
 
 comment :: Monoid m => Parser m
 comment = mempty <$ char '#' <* many (noneOf "\n")
