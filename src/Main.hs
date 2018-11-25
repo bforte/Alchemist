@@ -48,7 +48,7 @@ usage = usageInfo "usage: alchemist [-h] [-s SEED] (-e EXPR | FILE) INPUTS" opti
 
 
 main = getOpt Permute options <$> getArgs >>= \case
-  (args,xs,[]) -> runMain xs $ foldr ($) defaults args
+  (args,xs,[]) -> runMain xs $ foldr ($) defaults (reverse args)
   (_,_,err)    -> die $ concat err
 
 die = fail . (++usage) . (++"\n")
