@@ -44,7 +44,7 @@ options =
                | otherwise -> DF s
     help    (Flags e a s d _) = Flags e a s d True
 
-usage = usageInfo "usage: crn [-h] [-s SEED] (-e EXPR | FILE) INPUTS" options
+usage = usageInfo "usage: alchemist [-h] [-s SEED] (-e EXPR | FILE) INPUTS" options
 
 
 main = getOpt Permute options <$> getArgs >>= \case

@@ -1,4 +1,4 @@
-# crn - a non-deterministic esolang based on chemical reaction networks
+# Alchemist - a non-deterministic esolang based on chemical reaction networks
 
 ## Basics
 
@@ -35,8 +35,8 @@ The initial universe is either determined by user inputs, constant inputs or
 both:
 
   - **user inputs** are given via the commandline when invoking the
-    interpreter. For example `crn MyFantasticProgram.crn x:101` will use an
-    initial universe with 101 `x`s
+    interpreter. For example `alchemist MyFantasticProgram.crn x:101` will use
+    an initial universe with 101 `x`s
   - **constant inputs** are given in the source code directely. These inputs
     are also of the form `atomName:[0-9]+` and are specified after the rules,
     separated with a `!`
@@ -45,12 +45,12 @@ Usually these two will be merged, ie. the interpreter adds the numbers of the
 inputs of them, you can override the constant inputs completely by using the
 `--override` flag.
 
-For more information, see the [*Examples*](https://github.com/bforte/crn/tree/master/examples).
+For more information, see the [*Examples*](https://github.com/bforte/alchemist/tree/master/examples).
 
 ## Interpreter
 
-    bmo@Ooo % crn -h
-    usage: crn [-h] [-s SEED] (-e EXPR | FILE) INPUTS
+    bmo@Ooo % alchemist -h
+    usage: alchemist [-h] [-s SEED] (-e EXPR | FILE) INPUTS
       -e         --expression     evaluate expression
       -o         --override       override constant inputs (merges by default)
       -s SEED    --seed=SEED      set seed
@@ -64,8 +64,8 @@ print the used seed to *stderr*. For example:
 
     seed: "1957628721 1"
 
-If we now run `crn -s "1957628721 1" Program.crn` we will get the same results
-as in the previous run.
+If we now run `alchemist -s "1957628721 1" Program.crn` we will get the same
+results as in the previous run.
 
 ### Debugging
 
