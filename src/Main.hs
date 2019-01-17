@@ -17,8 +17,6 @@ import Parser
 
 type Add a = a -> a -> a
 
-data Debug = D0 | D1 | D2 | DF String deriving Eq
-
 --   Flags :       expr  add          seed          debug help
 data Flags = Flags Bool (Add Inputs) (Maybe String) Debug  Bool
 defaults = Flags False merge Nothing D0 False
@@ -61,13 +59,17 @@ runMain _ (Flags _ _ _ (DF d) _) =
 runMain (x:xs) (Flags e a s d _) = do
   src <- if e then pure x else readFile x
   maybe mempty (setStdGen . read) s
-  out <- either fail (runProg $ d == D2) $ do
+  (det,out) <- either fail (runProg d) $ do
     (prog,us) <- parseProg src
     vs <- zipWithM parseInput [1..] xs
     pure (prog, merge [("_",1)] us `a` merge [] vs)
   when (d /= D0) $ do
     hFlush stdout
-    hPutStrLn stderr "\n---------- Remaining Universe----------"
+    hPutStrLn stderr "\n--------------------------------------"
+    hPutStrLn stderr . ("seed: "++) . show . show =<< getStdGen
+    when det $
+      hPutStrLn stderr "The computation was deterministic"
+    hPutStrLn stderr "--------- Remaining Universe ---------"
     hPutStrLn stderr . unlines
                      $ sort ["  " ++ i ++ ": " ++ show c | (i,c) <- assocs out ]
 

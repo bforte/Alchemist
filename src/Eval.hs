@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
-module Eval ( Ident(..), Inputs, Prog, runProg ) where
+module Eval ( Debug(..), Ident(..), Inputs, Prog, runProg ) where
 
 import Control.Monad.State.Strict
+import Data.Bifunctor
 import Data.Char
 import Data.Foldable
 import Data.Function
@@ -20,6 +21,10 @@ type RHS = [(Integer,Ident)]
 
 type Universe = Map String Integer
 
+
+data Debug = D0 | D1 | D2 | DF String
+  deriving Eq
+
 data Ident = In String | Out String | Id String
   deriving (Eq,Ord)
 
@@ -35,27 +40,31 @@ instance {-# OVERLAPS #-} Show Rule where
     s 1 = ""
     s n = show n
 
-runProg :: Bool -> (Prog,Inputs) -> IO Universe
-runProg d (prog,xs) = do
-    hPutStrLn stderr . ("seed: "++) . show . show =<< getStdGen
-    runProg' d [(unify l, unify r) | (l,r) <- prog] xs
+runProg :: Debug -> (Prog,Inputs) -> IO (Bool,Universe)
+runProg d (prog,xs) = runProg' (d == D2) [(unify l, unify r) | (l,r) <- prog] xs
   where unify x = [ (sum cs,i)
                   | (cs,i:_) <- map unzip . groupBy ((==) `on` snd)
                                           $ sortOn snd x
                   ]
 
-runProg' :: Bool -> Prog -> Inputs -> IO Universe
-runProg' d prog xs = execStateT loop (fromList xs)  where
+runProg' :: Bool -> Prog -> Inputs -> IO (Bool,Universe)
+runProg' verbose prog xs = execStateT loop (True,fromList xs)  where
   loop = do
-    st <- get
+    st <- gets snd
     case filter (applicable st) prog of
       [] -> pure ()
       rs -> do
+        when (length rs > 1) $
+          puts first False
         r <- liftIO $ (rs !!) <$> randomRIO (0,length rs-1)
-        when d . liftIO $ hPrint stderr r
+        when verbose $
+          liftIO (hPrint stderr r)
         st' <- liftIO $ apply r st
-        put st'
+        puts second st'
         loop
+
+puts :: MonadState s m => ((y -> x) -> s -> s) -> x -> m ()
+puts f = modify . f . const
 
 applicable :: Universe -> Rule -> Bool
 applicable xs (lhs,_) = and
