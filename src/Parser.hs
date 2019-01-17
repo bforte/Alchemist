@@ -6,6 +6,8 @@ import Data.Bifunctor
 import Data.List
 import Data.Maybe
 import Text.Parsec
+import Text.Parsec.Language (haskell)
+import Text.Parsec.Token    (stringLiteral)
 
 import Eval
 
@@ -63,11 +65,6 @@ comment = mempty <$ char '#' <* many (noneOf "\n")
 cNewline :: Parser ()
 cNewline = () <$ newline <|> (comment <* newline)
 
-quoted :: Parser String
-quoted = between (char '"') (char '"') (many $ unescaped <|> escaped) where
-  unescaped = noneOf "\\\""
-  escaped = char '\\' *> oneOf "\\\""
-
 spaces' :: Parser ()
 spaces' = () <$ many (oneOf "\v\t\f ")
 
@@ -79,7 +76,7 @@ numberP = read <$> many1 digit
 
 identP :: Parser Ident
 identP =  In  <$> suffixP "In_" identP'
-      <|> Out <$> suffixP "Out_" (identP' <|> quoted)
+      <|> suffixP "Out_" (OutNum <$> identP' <|> OutStr <$> stringLiteral haskell)
       <|> Id  <$> identP'
   where suffixP s p = try (string s) *> p
 

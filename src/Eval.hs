@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, TypeSynonymInstances #-}
 
 module Eval ( Debug(..), Ident(..), Inputs, Prog, runProg ) where
 
@@ -25,12 +25,13 @@ type Universe = Map String Integer
 data Debug = D0 | D1 | D2 | DF String
   deriving Eq
 
-data Ident = In String | Out String | Id String
+data Ident = In String | OutStr String | OutNum String | Id String
   deriving (Eq,Ord)
 
 instance Show Ident where
     show (Id s) = s
-    show (Out s) = "Out_" ++ show s
+    show (OutNum s) = "Out_" ++ s
+    show (OutStr s) = "Out_" ++ show s
     show (In s) = "In_" ++ s
 
 instance {-# OVERLAPS #-} Show Rule where
@@ -41,11 +42,14 @@ instance {-# OVERLAPS #-} Show Rule where
     s n = show n
 
 runProg :: Debug -> (Prog,Inputs) -> IO (Bool,Universe)
-runProg d (prog,xs) = runProg' (d == D2) [(unify l, unify r) | (l,r) <- prog] xs
+runProg d (prog,xs) = runProg' (d == D2) [(unify l,unify' r) | (l,r) <- prog] xs
   where unify x = [ (sum cs,i)
                   | (cs,i:_) <- map unzip . groupBy ((==) `on` snd)
                                           $ sortOn snd x
                   ]
+        unify' x -- Only unify rules w/o side-effects
+          | all (\case{Id _->True;_->False}.snd) x = unify x
+          | otherwise = x
 
 runProg' :: Bool -> Prog -> Inputs -> IO (Bool,Universe)
 runProg' verbose prog xs = execStateT loop (True,fromList xs)  where
@@ -81,7 +85,9 @@ apply (lhs,rhs) xs = flip (foldlM alterM) rhs
   alterM m (n,In v) = do
     n' <- readNIntegers n
     pure $ alter (add' n') v m
-  alterM m (n,Out v) = m <$ putStr (concat $ genericReplicate n v)
+  alterM m (n,OutNum v) = m <$ putStr (concat $ genericReplicate n z)
+    where z = show $ sum [ n | (n,v')<-lhs, v == v'] + findWithDefault 0 v m
+  alterM m (n,OutStr v) = m <$ putStr (concat $ genericReplicate n v)
   alterM m (n,Id v) = pure $ alter (add' n) v m
 
   sub' :: Integer -> Integer -> Maybe Integer
