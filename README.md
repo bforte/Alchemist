@@ -1,4 +1,4 @@
-# [Alchemist][eso-wiki] - a non-deterministic esolang based on chemical reaction networks
+# Alchemist - a non-deterministic esolang based on chemical reaction networks
 
 ## Basics
 
@@ -15,8 +15,6 @@ There are two special types of atoms which can only appear on the right hand
 side of a reaction:
 
  - `Out_"some string"`: Prints `some string` to *stdout*
- - `Out_someAtom`: Prints the current number (before potentially changing the
-   amount) of `someAtom` to *stdout*
  - `In_someAtom`: Reads an integer from *stdin* and adds that many atoms of
    type `someAtom`
 
@@ -77,6 +75,3 @@ Debug levels:
   - **0:** quiet; prints only the used seed
   - **1:** helpful; like **0** but also prints the remaining universe at the end
   - **2:** noisy; like **1** but also prints each applied rule
-
-
-[eso-wiki]: https://esolangs.org/wiki/Alchemist
