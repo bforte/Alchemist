@@ -3,7 +3,6 @@
 module Eval ( Debug(..), Ident(..), Inputs, Prog, runProg ) where
 
 import Control.Monad.State.Strict
-import Data.Bifunctor
 import Data.Char
 import Data.Foldable
 import Data.Function
@@ -59,16 +58,13 @@ runProg' verbose prog xs = execStateT loop (True,fromList xs)  where
       [] -> pure ()
       rs -> do
         when (length rs > 1) $
-          puts first False
+          modify (\(_,b)-> (False,b))
         r <- liftIO $ (rs !!) <$> randomRIO (0,length rs-1)
         when verbose $
           liftIO (hPrint stderr r)
         st' <- liftIO $ apply r st
-        puts second st'
+        modify (\(a,_)-> (a,st'))
         loop
-
-puts :: MonadState s m => ((y -> x) -> s -> s) -> x -> m ()
-puts f = modify . f . const
 
 applicable :: Universe -> Rule -> Bool
 applicable xs (lhs,_) = and
