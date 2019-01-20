@@ -11,6 +11,8 @@ import Data.Map.Strict (Map, alter, findWithDefault, fromList, update)
 import System.IO
 import System.Random
 
+import Util
+
 
 type Inputs = [(String,Integer)]
 type Prog  = [Rule]

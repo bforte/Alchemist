@@ -13,6 +13,7 @@ import System.Random
 
 import Eval
 import Parser
+import Util
 
 
 type Add a = a -> a -> a

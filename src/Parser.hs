@@ -9,6 +9,7 @@ import Text.Parsec.Language (haskell)
 import Text.Parsec.Token    (stringLiteral)
 
 import Eval
+import Util
 
 type Parsed a = Either String a
 type Parser a = Parsec String () a
