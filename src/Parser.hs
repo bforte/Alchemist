@@ -2,7 +2,6 @@
 
 module Parser ( parseInput, parseProg ) where
 
-import Data.Bifunctor
 import Data.List
 import Data.Maybe
 import Text.Parsec
@@ -33,10 +32,12 @@ parseProg = parse' (progP <* eof) "src"  where
   rSepP = string' "->"
   iSepP = string' "+"
 
-  multi' p = multi p >>= \case
-    (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
-            -> fail $ "invalid atom: '" ++ s ++ "'"
-          | otherwise -> pure (i,s)
+  multi' p = do
+    x <- multi p
+    case x of
+      (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
+              -> fail $ "invalid atom: '" ++ s ++ "'"
+            | otherwise -> pure (i,s)
 
   multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
 
@@ -51,6 +52,7 @@ parseInput = parse' (inputP <* eof) . ("arg-"++) . show
 parse' :: Parser a -> SourceName -> String -> Parsed a
 parse' p s = first (pretty . show) . parse p s  where
   pretty = ('\n':) . (++"\n") . concatMap ("  "++) . lines
+  first f (a,b) = (f a,b)
 
 
 {- Some more general parsers -}

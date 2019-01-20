@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, LambdaCase, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 module Eval ( Debug(..), Ident(..), Inputs, Prog, runProg ) where
 
@@ -47,8 +47,11 @@ runProg d (prog,xs) = runProg' (d == D2) [(unify l,unify' r) | (l,r) <- prog] xs
                                           $ sortOn snd x
                   ]
         unify' x -- Only unify rules w/o side-effects
-          | all (\case{Id _->True;_->False}.snd) x = unify x
+          | all (isId . snd) x = unify x
           | otherwise = x
+
+isId (Id _) = True
+isId _ = False
 
 runProg' :: Bool -> Prog -> Inputs -> IO (Bool,Universe)
 runProg' verbose prog xs = execStateT loop (True,fromList xs)  where
@@ -99,10 +102,12 @@ apply (lhs,rhs) xs = flip (foldlM alterM) rhs
     | n <= 0    = pure 0
     | otherwise = (+) <$> readNIntegers (n-1) <*> readNumber
 
-  readNumber = getLine >>= \case
-    "" -> readNumber
-    s | all isDigit s -> pure $ read s
-      | otherwise -> hPutStrLn stderr "invalid input" >> readNumber
+  readNumber = do
+    x <- getLine
+    case x of
+      "" -> readNumber
+      s | all isDigit s -> pure $ read s
+        | otherwise -> hPutStrLn stderr "invalid input" >> readNumber
 
 
 count :: String -> Universe -> Integer
