@@ -3,7 +3,6 @@ module Main where
 
 import Control.Monad
 import Data.Char
-import Data.Function
 import Data.List
 import Data.Map.Strict (assocs)
 import System.Console.GetOpt
@@ -15,11 +14,16 @@ import Eval
 import Parser
 
 
-type Add a = a -> a -> a
+data Flags = Flags
+   Bool                          -- evaluate expr?
+   (Inputs -> Inputs -> Inputs)  -- how to merge inputs
+   (Maybe String)                -- seed
+   Debug                         -- debugging level
+   Bool                          -- print help?
 
---   Flags :       expr  add          seed          debug help
-data Flags = Flags Bool (Add Inputs) (Maybe String) Debug  Bool
 defaults = Flags False merge Nothing D0 False
+
+merge a b = unify (a++b)
 
 options =
   [ Option "e" ["expression"] (NoArg expr) "evaluate expression"
@@ -61,8 +65,12 @@ runMain (x:xs) (Flags e a s d _) = do
   maybe mempty (setStdGen . read) s
   (det,out) <- either fail (runProg d) $ do
     (prog,us) <- parseProg src
-    vs <- zipWithM parseInput [1..] xs
-    pure (prog, merge [("_",1)] us `a` merge [] vs)
+    vs <- concat <$> zipWithM parseInput [1..] xs
+    let inputs' = us `a` vs
+        inputs
+          | any (("_"==).snd) inputs' = inputs'
+          | otherwise = (1,"_") : inputs'
+    pure (prog, merge [] inputs)
   when (d /= D0) $ do
     hFlush stdout
     hPutStrLn stderr "\n--------------------------------------"
@@ -72,10 +80,3 @@ runMain (x:xs) (Flags e a s d _) = do
     hPutStrLn stderr "--------- Remaining Universe ---------"
     hPutStrLn stderr . unlines
                      $ sort ["  " ++ i ++ ": " ++ show c | (i,c) <- assocs out ]
-
-merge a b =
-  [ (i,sum cs)
-  | (i:_,cs) <- map unzip . groupBy ((==) `on` fst)
-                          . sortOn fst
-                          $ a ++ b
-  ]

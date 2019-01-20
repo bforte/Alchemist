@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Parser ( parseInput, parseProg ) where
 
@@ -6,6 +6,8 @@ import Data.Bifunctor
 import Data.List
 import Data.Maybe
 import Text.Parsec
+import Text.Parsec.Language (haskell)
+import Text.Parsec.Token    (stringLiteral)
 
 import Eval
 
@@ -17,33 +19,42 @@ type Parser a = Parsec String () a
 parseProg :: String -> Parsed (Prog,Inputs)
 parseProg = parse' (progP <* eof) "src"  where
 
-  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline
-                          <*> (inputsP <* eof <|> [] <$ eof)
-
   -- Parsing the program
-  lineP = Just <$> ruleP <|> comment
-
-  ruleP = (,) <$> (spaces *> lhsP) <*> (rSepP *> rhsP <* spaces')
-
-  lhsP = multi' (identP' <* spaces') `sepBy` iSepP
-  rhsP = multi  (identP  <* spaces') `sepBy` iSepP
-
-  rSepP = string' "->"
-  iSepP = string' "+"
-
-  multi' p = multi p >>= \case
-    (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
-            -> fail $ "invalid atom: '" ++ s ++ "'"
-          | otherwise -> pure (i,s)
-
-  multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
+  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline
+                          <*> (constantInputs <* eof' <|> [] <$ eof')
 
   -- Parsing possible inputs separated by bang
-  inputsP = char '!' *> inputP `sepEndBy` many1 space
+  constantInputs = char '!' *> spaces *> lhsP
+
+  eof' = many cNewline >> eof
+
+
+lineP :: Parser (Maybe Rule)
+lineP = Just <$> ruleP <|> comment
+  where ruleP = (,) <$> (spaces *> lhsP) <*> (rSepP *> rhsP <* spaces')
+
+lhsP :: Parser LHS
+lhsP = multi' (identP' <* spaces') `sepBy` iSepP
+
+rhsP :: Parser RHS
+rhsP = multi  (identP  <* spaces') `sepBy` iSepP
+
+rSepP, iSepP :: Parser String
+rSepP = string' "->"
+iSepP = string' "+"
+
+multi' :: Parser String -> Parser (Integer, String)
+multi' p = multi p >>= \case
+  (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
+          -> fail $ "invalid atom: '" ++ s ++ "'"
+        | otherwise -> pure (i,s)
+
+multi :: Parser a -> Parser (Integer, a)
+multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
 
 -- | Parse a single command-line argument of the form IDENT:NUMBER
-parseInput :: Integer -> String -> Parsed (String,Integer)
-parseInput = parse' (inputP <* eof) . ("arg-"++) . show
+parseInput :: Integer -> String -> Parsed Inputs
+parseInput = parse' (lhsP <* eof) . ("arg-"++) . show
 
 
 parse' :: Parser a -> SourceName -> String -> Parsed a
@@ -53,20 +64,11 @@ parse' p s = first (pretty . show) . parse p s  where
 
 {- Some more general parsers -}
 
-inputP :: Parser (String,Integer)
-inputP =  (,) <$> identP' <*> (char ':' *> numberP)
-      <|> ("_",) . pred <$> numberP
-
 comment :: Monoid m => Parser m
 comment = mempty <$ char '#' <* many (noneOf "\n")
 
 cNewline :: Parser ()
 cNewline = () <$ newline <|> (comment <* newline)
-
-quoted :: Parser String
-quoted = between (char '"') (char '"') (many $ unescaped <|> escaped) where
-  unescaped = noneOf "\\\""
-  escaped = char '\\' *> oneOf "\\\""
 
 spaces' :: Parser ()
 spaces' = () <$ many (oneOf "\v\t\f ")
@@ -79,7 +81,7 @@ numberP = read <$> many1 digit
 
 identP :: Parser Ident
 identP =  In  <$> suffixP "In_" identP'
-      <|> Out <$> suffixP "Out_" (identP' <|> quoted)
+      <|> suffixP "Out_" (OutNum <$> identP' <|> OutStr <$> stringLiteral haskell)
       <|> Id  <$> identP'
   where suffixP s p = try (string s) *> p
 
