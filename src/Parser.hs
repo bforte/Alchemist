@@ -3,11 +3,10 @@
 module Parser ( parseInput, parseProg ) where
 
 import Data.Bifunctor
+import Data.Char
 import Data.List
 import Data.Maybe
 import Text.Parsec
-import Text.Parsec.Language (haskell)
-import Text.Parsec.Token    (stringLiteral)
 
 import Eval
 
@@ -15,46 +14,11 @@ type Parsed a = Either String a
 type Parser a = Parsec String () a
 
 
--- | Parse a complete program; ie. multiple rules (LHS,RHS) ignoring comments
 parseProg :: String -> Parsed (Prog,Inputs)
-parseProg = parse' (progP <* eof) "src"  where
+parseProg = parse' (prog <* eof) "src"
 
-  -- Parsing the program
-  progP = (,) . catMaybes <$> lineP `sepEndBy` cNewline
-                          <*> (constantInputs <* eof' <|> [] <$ eof')
-
-  -- Parsing possible inputs separated by bang
-  constantInputs = char '!' *> spaces *> lhsP
-
-  eof' = many cNewline >> eof
-
-
-lineP :: Parser (Maybe Rule)
-lineP = Just <$> ruleP <|> comment
-  where ruleP = (,) <$> (spaces *> lhsP) <*> (rSepP *> rhsP <* spaces')
-
-lhsP :: Parser LHS
-lhsP = multi' (identP' <* spaces') `sepBy` iSepP
-
-rhsP :: Parser RHS
-rhsP = multi  (identP  <* spaces') `sepBy` iSepP
-
-rSepP, iSepP :: Parser String
-rSepP = string' "->"
-iSepP = string' "+"
-
-multi' :: Parser String -> Parser (Integer, String)
-multi' p = multi p >>= \case
-  (i,s) | "In_" `isPrefixOf` s || "Out_" `isPrefixOf` s
-          -> fail $ "invalid atom: '" ++ s ++ "'"
-        | otherwise -> pure (i,s)
-
-multi :: Parser a -> Parser (Integer, a)
-multi p = (,) <$> (numberP <|> pure 1) <*> (spaces' *> p)
-
--- | Parse a single command-line argument of the form IDENT:NUMBER
 parseInput :: Integer -> String -> Parsed Inputs
-parseInput = parse' (lhsP <* eof) . ("arg-"++) . show
+parseInput = parse' (spaces' *> lhs <* eof) . ("arg-"++) . show
 
 
 parse' :: Parser a -> SourceName -> String -> Parsed a
@@ -62,29 +26,145 @@ parse' p s = first (pretty . show) . parse p s  where
   pretty = ('\n':) . (++"\n") . concatMap ("  "++) . lines
 
 
-{- Some more general parsers -}
+{- Alchemist parsers -}
 
-comment :: Monoid m => Parser m
-comment = mempty <$ char '#' <* many (noneOf "\n")
+prog :: Parser (Prog,Inputs)
+prog = (,) <$> body <*> inputs where
+    body   = catMaybes <$> many line
+    inputs = option [] (char '!' *> spaces *> lhs)
 
-cNewline :: Parser ()
-cNewline = () <$ newline <|> (comment <* newline)
 
-spaces' :: Parser ()
-spaces' = () <$ many (oneOf "\v\t\f ")
+line :: Parser (Maybe Rule)
+line = spaces' *> option Nothing (Just <$> rule) <* eol
 
-string' :: String -> Parser String
-string' s = string s <* spaces'
+rule :: Parser Rule
+rule = (,) <$> (lhs <* string "->") <*> rhs
 
-numberP :: Parser Integer
-numberP = read <$> many1 digit
+lhs :: Parser LHS
+lhs = sepByPlus1 (multiple simpleAtom) where
+  simpleAtom = ident >>= \case
+    i | "In_" `isPrefixOf` i || "Out_" `isPrefixOf` i
+        -> fail $ "invalid atom: '" ++ i ++ "'"
+      | otherwise -> pure i
 
-identP :: Parser Ident
-identP =  In  <$> suffixP "In_" identP'
-      <|> suffixP "Out_" (OutNum <$> identP' <|> OutStr <$> stringLiteral haskell)
-      <|> Id  <$> identP'
-  where suffixP s p = try (string s) *> p
+rhs :: Parser RHS
+rhs = spaces' *> sepByPlus1 (multiple atom) where
+    atom = ident >>= \case
+      i | "In_" `isPrefixOf` i -> pure . In $ drop 3 i
+        | "Out_" `isPrefixOf` i -> out $ drop 4 i
+        | otherwise -> pure $ Id i
 
-identP' :: Parser String
-identP' = (:) <$> nd <*> many (nd <|> digit)  where
-  nd = letter <|> char '_'
+    out i@(c:_)
+      | isAlpha c || c == '_' = pure $ OutNum i
+      | otherwise = fail $ "invalid atom: '" ++ i ++ "'"
+    out "" = OutStr <$> stringLit
+
+
+{- Combinators -}
+
+sepByPlus1 :: Parser a -> Parser [a]
+sepByPlus1 p = sepBy1 (p <* spaces') (char '+' *> spaces')
+
+multiple :: Parser a -> Parser (Integer,a)
+multiple p = (,) <$> option 1 (numberLit <* spaces') <*> p
+
+
+{- Tokens -}
+
+eol :: Parser ()
+eol = option () lineComment <* newline
+
+spaces' = skipMany (satisfy isSpace') <?> "white space" where
+  isSpace' '\n' = False
+  isSpace' c = isSpace c
+
+lineComment :: Parser ()
+lineComment = () <$ char '#' <* many (noneOf "\n")
+
+ident :: Parser String
+ident = (:) <$> (letter <|> char '_') <*> many (alphaNum <|> char '_')
+
+numberLit :: Parser Integer
+numberLit = read <$> many1 digit
+
+-- Parse a quoted string literal, taken from http://hackage.haskell.org/package/parsec-3.1.13.0/docs/src/Text.Parsec.Token.html#makeTokenParser
+-- (stringLiteral haskell) won't do the job since it will consume spaces too..
+stringLit :: Parser String
+stringLit =
+  (do str <- between (char '"')
+                     (char '"' <?> "end of string")
+                     (many stringChar)
+      return (foldr (maybe id (:)) "" str)
+  ) <?> "literal string"
+
+  where
+    stringChar      =   do{ c <- stringLetter; return (Just c) }
+                    <|> stringEscape
+                    <?> "string character"
+
+    stringLetter    = satisfy (\c -> (c /= '"') && (c /= '\\') && (c > '\026'))
+
+    stringEscape    = do{ _ <- char '\\'
+                        ;     do{ _ <- escapeGap  ; return Nothing }
+                          <|> do{ _ <- escapeEmpty; return Nothing }
+                          <|> do{ esc <- escapeCode; return (Just esc) }
+                        }
+
+    escapeEmpty     = char '&'
+    escapeGap       = do{ _ <- many1 space
+                        ; char '\\' <?> "end of string gap"
+                        }
+
+
+
+    -- escape codes
+    escapeCode      = charEsc <|> charNum <|> charAscii <|> charControl
+                    <?> "escape code"
+
+    charControl     = do{ _ <- char '^'
+                        ; code <- upper
+                        ; return (toEnum (fromEnum code - fromEnum 'A' + 1))
+                        }
+
+    charNum         = do{ code <- decimal
+                                  <|> do{ _ <- char 'o'; number 8 octDigit }
+                                  <|> do{ _ <- char 'x'; number 16 hexDigit }
+                        ; if code > 0x10FFFF
+                          then fail "invalid escape sequence"
+                          else return (toEnum (fromInteger code))
+                        }
+
+    charEsc         = choice (map parseEsc escMap)
+                    where
+                      parseEsc (c,code)     = do{ _ <- char c; return code }
+
+    charAscii       = choice (map parseAscii asciiMap)
+                    where
+                      parseAscii (asc,code) = try (do{ _ <- string asc; return code })
+
+
+    -- escape code tables
+    escMap          = zip ("abfnrtv\\\"\'") ("\a\b\f\n\r\t\v\\\"\'")
+    asciiMap        = zip (ascii3codes ++ ascii2codes) (ascii3 ++ ascii2)
+
+    ascii2codes     = ["BS","HT","LF","VT","FF","CR","SO","SI","EM",
+                       "FS","GS","RS","US","SP"]
+    ascii3codes     = ["NUL","SOH","STX","ETX","EOT","ENQ","ACK","BEL",
+                       "DLE","DC1","DC2","DC3","DC4","NAK","SYN","ETB",
+                       "CAN","SUB","ESC","DEL"]
+
+    ascii2          = ['\BS','\HT','\LF','\VT','\FF','\CR','\SO','\SI',
+                       '\EM','\FS','\GS','\RS','\US','\SP']
+    ascii3          = ['\NUL','\SOH','\STX','\ETX','\EOT','\ENQ','\ACK',
+                       '\BEL','\DLE','\DC1','\DC2','\DC3','\DC4','\NAK',
+                       '\SYN','\ETB','\CAN','\SUB','\ESC','\DEL']
+
+    -- integer parsing
+
+    decimal         = number 10 digit
+
+    number base baseDigit
+        = do{ digits <- many1 baseDigit
+            ; let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
+            ; seq n (return n)
+            }
