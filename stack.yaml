@@ -2,3 +2,20 @@ resolver: ghc-8.4.4
 
 packages:
 - .
+
+extra-deps:
+- ansi-terminal-0.8.2
+- call-stack-0.1.0
+- clock-0.7.2
+- colour-2.3.4
+- erf-2.0.0.0
+- hspec-2.7.0
+- hspec-core-2.7.0
+- hspec-discover-2.7.0
+- hspec-expectations-0.8.2
+- HUnit-1.6.0.0
+- primitive-0.6.4.0
+- QuickCheck-2.12.6.1
+- quickcheck-io-0.2.0
+- setenv-0.1.1.3
+- tf-random-0.5

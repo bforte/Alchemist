@@ -13,15 +13,38 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 executable alchemist
-  hs-source-dirs:      src
-  main-is:             Main.hs
-  other-modules:       Eval
-                     , Parser
-  default-language:    Haskell2010
-  default-extensions:  LambdaCase
-  ghc-options:         -Wunused-imports -Wunused-matches -Wincomplete-patterns -O2 -threaded
-  build-depends:       base >= 4.7 && < 5
-                     , containers
-                     , mtl
-                     , parsec
-                     , random
+  hs-source-dirs:        src
+  main-is:               Main.hs
+  other-modules:         Eval
+                       , Parser
+  default-extensions:    LambdaCase
+  default-language:      Haskell2010
+  ghc-options:           -Wunused-imports -Wunused-matches -Wincomplete-patterns -threaded
+  build-depends:         base >= 4.7 && < 5
+                       , containers
+                       , mtl
+                       , parsec
+                       , random
+
+library
+  exposed-modules:       Parser
+  other-modules:         Eval
+  hs-source-dirs:        src
+  build-depends:         base >=4.7 && <5
+                       , containers
+                       , mtl
+                       , parsec
+                       , random
+  default-extensions:    LambdaCase
+  default-language:      Haskell2010
+
+test-suite parser-tests
+  type:                  exitcode-stdio-1.0
+  main-is:               Spec.hs
+  hs-source-dirs:        test
+  build-depends:         base
+                       , Alchemist
+                       , hspec
+                       , parsec
+  default-extensions:    LambdaCase
+  default-language:      Haskell2010

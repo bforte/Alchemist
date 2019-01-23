@@ -1,6 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser ( parseInput, parseProg ) where
+module Parser
+    ( parseInput, parseProg
+    , lhs, rhs, rule, prog, Parser
+    ) where
 
 import Data.Bifunctor
 import Data.Char
@@ -30,49 +33,55 @@ parse' p s = first (pretty . show) . parse p s  where
 
 prog :: Parser (Prog,Inputs)
 prog = (,) <$> body <*> inputs where
-    body   = catMaybes <$> many line
-    inputs = option [] (char '!' *> spaces *> lhs)
+    body   = catMaybes <$> sepEndBy (spaces' *> line <* spaces') eol
+    inputs = option [] (char '!' *> spaces *> lhs <* spaces)
 
 
 line :: Parser (Maybe Rule)
-line = spaces' *> option Nothing (Just <$> rule) <* eol
+line =  Just <$> rule
+    <|> Nothing <$ lineComment
+    <|> Nothing <$ lookAhead newline
 
 rule :: Parser Rule
 rule = (,) <$> (lhs <* string "->") <*> rhs
 
 lhs :: Parser LHS
-lhs = sepByPlus1 (multiple simpleAtom) where
+lhs = sepByPlus (multiple simpleAtom) where
   simpleAtom = ident >>= \case
     i | "In_" `isPrefixOf` i || "Out_" `isPrefixOf` i
-        -> fail $ "invalid atom: '" ++ i ++ "'"
+        -> invalidAtom i
       | otherwise -> pure i
 
 rhs :: Parser RHS
-rhs = spaces' *> sepByPlus1 (multiple atom) where
+rhs = spaces' *> sepByPlus (multiple atom) where
     atom = ident >>= \case
-      i | "In_" `isPrefixOf` i -> pure . In $ drop 3 i
+      i | "In_" `isPrefixOf` i && length i > 3 -> pure . In $ drop 3 i
+        | "In_" `isPrefixOf` i  -> invalidAtom i
         | "Out_" `isPrefixOf` i -> out $ drop 4 i
         | otherwise -> pure $ Id i
 
     out i@(c:_)
       | isAlpha c || c == '_' = pure $ OutNum i
-      | otherwise = fail $ "invalid atom: '" ++ i ++ "'"
+      | otherwise = invalidAtom i
     out "" = OutStr <$> stringLit
 
 
 {- Combinators -}
 
-sepByPlus1 :: Parser a -> Parser [a]
-sepByPlus1 p = sepBy1 (p <* spaces') (char '+' *> spaces')
+sepByPlus :: Parser a -> Parser [a]
+sepByPlus p = sepBy (p <* spaces') (char '+' *> spaces')
 
 multiple :: Parser a -> Parser (Integer,a)
 multiple p = (,) <$> option 1 (numberLit <* spaces') <*> p
+
+invalidAtom :: Monad m => String -> m a
+invalidAtom = fail . ("invalid atom: '"++) . (++"'")
 
 
 {- Tokens -}
 
 eol :: Parser ()
-eol = option () lineComment <* newline
+eol = option () lineComment <* (() <$ newline <|> eof)
 
 spaces' = skipMany (satisfy isSpace') <?> "white space" where
   isSpace' '\n' = False
