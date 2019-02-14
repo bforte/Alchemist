@@ -28,7 +28,14 @@ type Vect   = V.Vector Integer
 data Debug = D0 | D1 | D2 | DF String
   deriving Eq
 
-data Atom = In String | OutStr String | OutNum String | Id String | Clear | Dump
+data Atom = In String
+  | InC String
+  | OutStr String
+  | OutNum String
+  | OutC String
+  | Id String
+  | Clear
+  | Dump
   deriving (Eq,Ord)
 
 instance Show Atom where
@@ -36,6 +43,8 @@ instance Show Atom where
     show (OutNum s) = "Out_" ++ s
     show (OutStr s) = "Out_" ++ show s
     show (In s) = "In_" ++ s
+    show (InC s) = "In'" ++ s
+    show (OutC s) = "Out'" ++ s
     show Clear = "%"
     show Dump = "?"
 
@@ -113,9 +122,17 @@ runProg' verbose prog xs = do
         go v (Just (n, In s)) = do
           ns <- readNIntegers n
           pure . V.zipWith (+) v $ lhs [(ns,s)]
-        go v (Just (n, OutStr s)) = v <$ forM_ [1..n] (const $ putStr s)
-        go v (Just (n, OutNum s)) = v <$ forM_ [1..n] (const . putStr . show $ v V.! atnum s)
-        go v (Just (n, Dump)) = v <$ forM_ [1..n] (const . hPutStrLn stderr $ showUniv v)
+        go v (Just (n, OutStr s)) = v <$ forM_ [1..n]
+          (const $ putStr s)
+        go v (Just (n, OutNum s)) = v <$ forM_ [1..n]
+          (const . putStr . show $ v V.! atnum s)
+        go v (Just (n, InC s)) = do
+          ns <- readNChars n
+          pure . V.zipWith (+) v $ lhs [(ns,s)]
+        go v (Just (n, OutC s)) = v <$ forM_ [1..n]
+          (const . putChar . chr . (`mod` 255) . fromIntegral $ v V.! atnum s)
+        go v (Just (n, Dump)) = v <$ forM_ [1..n]
+          (const . hPutStrLn stderr $ showUniv v)
         go v (Just (_, Clear)) = pure $ V.map (const 0) v
 
     printRule c r u = when (c > 0)
@@ -149,20 +166,21 @@ split = unfoldr go where
     | otherwise = Just ((r,Nothing),[])
 
 noSideEffect :: (a,Atom) -> Bool
-noSideEffect (snd -> In _) = False
-noSideEffect (snd -> OutNum _) = False
-noSideEffect (snd -> OutStr _) = False
-noSideEffect (snd -> Clear) = False
-noSideEffect (snd -> Dump) = False
-noSideEffect _ = True
+noSideEffect (snd -> Id _) = True
+noSideEffect _ = False
 
 reachable, reachable' :: Atom -> Maybe String
 reachable (Id s) = Just s
 reachable (In s) = Just s
+reachable (InC s) = Just s
 reachable _ = Nothing
 reachable' (OutNum s) = Just s
+reachable' (OutC s) = Just s
 reachable' x = reachable x
 
+
+readNChars :: Integer -> IO Integer
+readNChars n = fromIntegral <$> foldM (\b _-> (b+) . ord <$> getChar) 0 [1..n]
 
 readNIntegers :: Integer -> IO Integer
 readNIntegers n

@@ -58,6 +58,8 @@ rhs = spaces' *> sepByPlus (multiple $ identAtom <|> charAtom) where
       i | "In_" `isPrefixOf` i && length i > 3 -> pure . In $ drop 3 i
         | "In_" `isPrefixOf` i  -> invalidAtom i
         | "Out_" `isPrefixOf` i -> out $ drop 4 i
+        | "In" `isPrefixOf` i  -> char '\'' >> InC  <$> ident
+        | "Out" `isPrefixOf` i -> char '\'' >> OutC <$> ident
         | otherwise -> pure $ Id i
 
     charAtom = (Dump <$ char '?') <|> (Clear <$ char '%')
