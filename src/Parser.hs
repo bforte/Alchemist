@@ -107,7 +107,7 @@ stringLit =
   ) <?> "literal string"
 
   where
-    stringChar      =   do{ c <- stringLetter; return (Just c) }
+    stringChar      =   Just <$> stringLetter
                     <|> stringEscape
                     <?> "string character"
 
@@ -116,7 +116,7 @@ stringLit =
     stringEscape    = do{ _ <- char '\\'
                         ;     do{ _ <- escapeGap  ; return Nothing }
                           <|> do{ _ <- escapeEmpty; return Nothing }
-                          <|> do{ esc <- escapeCode; return (Just esc) }
+                          <|> Just <$> escapeCode
                         }
 
     escapeEmpty     = char '&'
@@ -153,7 +153,7 @@ stringLit =
 
 
     -- escape code tables
-    escMap          = zip ("abfnrtv\\\"\'") ("\a\b\f\n\r\t\v\\\"\'")
+    escMap          = zip "abfnrtv\\\"\'" "\a\b\f\n\r\t\v\\\"\'"
     asciiMap        = zip (ascii3codes ++ ascii2codes) (ascii3 ++ ascii2)
 
     ascii2codes     = ["BS","HT","LF","VT","FF","CR","SO","SI","EM",

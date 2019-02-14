@@ -3,8 +3,6 @@ module Main where
 
 import Control.Monad
 import Data.Char
-import Data.List
-import Data.Map.Strict (assocs)
 import System.Console.GetOpt
 import System.Environment
 import System.IO
@@ -63,6 +61,7 @@ runMain _ (Flags _ _ _ (DF d) _) =
 runMain (x:xs) (Flags e a s d _) = do
   src <- if e then pure x else readFile x
   maybe mempty (setStdGen . read) s
+  mapM_ (`hSetBuffering` NoBuffering) [stdout,stderr]
   (det,out) <- either fail (runProg d) $ do
     (prog,us) <- parseProg src
     vs <- concat <$> zipWithM parseInput [1..] xs
@@ -72,11 +71,9 @@ runMain (x:xs) (Flags e a s d _) = do
           | otherwise = (1,"_") : inputs'
     pure (prog, merge [] inputs)
   when (d /= D0) $ do
-    hFlush stdout
     hPutStrLn stderr "\n--------------------------------------"
     hPutStrLn stderr . ("seed: "++) . show . show =<< getStdGen
     when det $
       hPutStrLn stderr "The computation was deterministic"
     hPutStrLn stderr "--------- Remaining Universe ---------"
-    hPutStrLn stderr . unlines
-                     $ sort ["  " ++ i ++ ": " ++ show c | (i,c) <- assocs out ]
+    hPutStrLn stderr out
