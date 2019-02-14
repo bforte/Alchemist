@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards, ViewPatterns #-}
 
-module Eval (optimize, runProg, unify, Debug(..), Ident(..), Inputs, Prog, Rule, LHS, RHS) where
+module Eval (optimize, runProg, unify, Debug(..), Atom(..), Inputs, Prog, Rule, LHS, RHS) where
 
 import Control.Monad.State.Strict
 import Data.Char
@@ -21,21 +21,23 @@ type Inputs = LHS
 type Prog   = [Rule]
 type Rule   = (LHS,RHS)
 type LHS    = [(Integer,String)]
-type RHS    = [(Integer,Ident)]
+type RHS    = [(Integer,Atom)]
 type Vect   = V.Vector Integer
 
 
 data Debug = D0 | D1 | D2 | DF String
   deriving Eq
 
-data Ident = In String | OutStr String | OutNum String | Id String
+data Atom = In String | OutStr String | OutNum String | Id String | Clear | Dump
   deriving (Eq,Ord)
 
-instance Show Ident where
+instance Show Atom where
     show (Id s) = s
     show (OutNum s) = "Out_" ++ s
     show (OutStr s) = "Out_" ++ show s
     show (In s) = "In_" ++ s
+    show Clear = "%"
+    show Dump = "?"
 
 instance {-# OVERLAPS #-} Show Rule where
   show (l,r) = sl l ++ " -> " ++ sr r where
@@ -45,8 +47,7 @@ instance {-# OVERLAPS #-} Show Rule where
     s n = show n
 
 runProg :: Debug -> (Prog,Inputs) -> IO (Bool,String)
-runProg d (prog,xs) =do
-    print prog
+runProg d (prog,xs) =
     runProg' (d == D2) (optimize [(unify l,unify' r) | (l,r) <- prog] xs) xs
   where unify' x -- Only unify rules w/o side-effects
           | all noSideEffect x = unify x
@@ -57,7 +58,6 @@ data St = S { det :: Bool, univ :: V.Vector Integer, lrule :: Rule, rulec :: Int
 
 runProg' :: Bool -> Prog -> Inputs -> IO (Bool,String)
 runProg' verbose prog xs = do
-    print prog
     S{..} <- execStateT loop (S True (lhs xs) ([],[]) 0)
     pure (det, showUniv univ)
   where
@@ -101,11 +101,11 @@ runProg' verbose prog xs = do
       $ any (\(n,s)->(if n < 1 then (0/=) else (n>))$ u V.!atnum s) l
 
     applyRule :: Rule -> Vect -> IO Vect
-    applyRule (l,r) u = go (V.zipWith (-) u (lhs l)) (split r)
+    applyRule (l,r) u = go (V.zipWith (-) u (lhs l)) $ split r
       where go !z [] = pure z
             go !z (r:rs) = (`go` rs) =<< doIO z r
 
-    doIO :: V.Vector Integer -> (RHS,Maybe(Integer,Ident)) -> IO Vect
+    doIO :: V.Vector Integer -> (RHS,Maybe(Integer,Atom)) -> IO Vect
     doIO !u (rs,k) = go (V.zipWith (+) u (rhs rs)) k
       where
         go v Nothing = pure v
@@ -115,6 +115,8 @@ runProg' verbose prog xs = do
           pure . V.zipWith (+) v $ lhs [(ns,s)]
         go v (Just (n, OutStr s)) = v <$ forM_ [1..n] (const $ putStr s)
         go v (Just (n, OutNum s)) = v <$ forM_ [1..n] (const . putStr . show $ v V.! atnum s)
+        go v (Just (n, Dump)) = v <$ forM_ [1..n] (const . hPutStrLn stderr $ showUniv v)
+        go v (Just (_, Clear)) = pure $ V.map (const 0) v
 
     printRule c r u = when (c > 0)
       . liftIO
@@ -139,20 +141,22 @@ optimize p xs = go p $ optimize' p
               | l == fst r = []
               | otherwise  = mapMaybe (reachable . snd) $ snd r
 
-split :: RHS -> [(RHS,Maybe (Integer,Ident))]
+split :: RHS -> [(RHS,Maybe (Integer,Atom))]
 split = unfoldr go where
   go [] = Nothing
   go r
     | (x,y:z) <- span noSideEffect r = Just ((x,Just y),z)
     | otherwise = Just ((r,Nothing),[])
 
-noSideEffect :: (a,Ident) -> Bool
+noSideEffect :: (a,Atom) -> Bool
 noSideEffect (snd -> In _) = False
 noSideEffect (snd -> OutNum _) = False
 noSideEffect (snd -> OutStr _) = False
+noSideEffect (snd -> Clear) = False
+noSideEffect (snd -> Dump) = False
 noSideEffect _ = True
 
-reachable, reachable' :: Ident -> Maybe String
+reachable, reachable' :: Atom -> Maybe String
 reachable (Id s) = Just s
 reachable (In s) = Just s
 reachable _ = Nothing

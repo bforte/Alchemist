@@ -53,12 +53,14 @@ lhs = sepByPlus (multiple simpleAtom) where
       | otherwise -> pure i
 
 rhs :: Parser RHS
-rhs = spaces' *> sepByPlus (multiple atom) where
-    atom = ident >>= \case
+rhs = spaces' *> sepByPlus (multiple $ identAtom <|> charAtom) where
+    identAtom = ident >>= \case
       i | "In_" `isPrefixOf` i && length i > 3 -> pure . In $ drop 3 i
         | "In_" `isPrefixOf` i  -> invalidAtom i
         | "Out_" `isPrefixOf` i -> out $ drop 4 i
         | otherwise -> pure $ Id i
+
+    charAtom = (Dump <$ char '?') <|> (Clear <$ char '%')
 
     out i@(c:_)
       | isAlpha c || c == '_' = pure $ OutNum i
